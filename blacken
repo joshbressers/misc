@@ -1,0 +1,51 @@
+#!/usr/bin/env perl
+#
+# $Id: blacken 29 2006-10-09 02:20:40Z bress $
+#
+
+use strict;
+use Getopt::Std;
+use File::Copy;
+
+sub do_help;
+
+my ($arg, $white, @tabs, %args);
+
+getopts("h", \%args);
+if ($args{'h'}) { do_help(); }
+
+foreach $arg (@ARGV) {
+    print "Processing file $arg:\n";
+    open(OUT, ">$arg.blacken.tmp") or
+        die "Can't open $arg.blacken.tmp\n";
+    open(IN, $arg) or die "Can't open $arg\n";
+
+    while(<IN>) {
+        push @tabs, $. if /\t/;
+        chomp;
+        $white++ if s/\s+$//;
+        print OUT "$_\n";
+    }
+    close(IN);
+    close(OUT);
+    foreach (@tabs) {
+        print "Tab found on line $_\n";
+    }
+    $#tabs = -1;
+    print "Removed $white lines of trailing whitespace\n\n";
+    $white = 0;
+    move("$arg.blacken.tmp", $arg) or die "move failed on $arg\n";
+}
+
+sub do_help {
+
+    print <<EOF
+
+usage: blacken [-h] file1 file2 ...
+Remove the whitespace from file(s).  This command will also complain if the
+file contains tabs.
+
+-h : This message
+
+EOF
+}

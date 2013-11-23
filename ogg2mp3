@@ -1,0 +1,35 @@
+#!/bin/sh
+
+# $Id: ogg2mp3 39 2007-04-30 11:57:46Z bress $
+
+SOURCEDIR=$1
+DESTDIR=$2
+
+cd $SOURCEDIR
+
+FILES=`find * -name '*.ogg' -print`
+
+for i in $FILES;
+do
+    filename=`basename $i .ogg`
+    dirname=`dirname $i`
+    mkdir -p $DESTDIR/$dirname
+
+    title=`vorbiscomment -l $i | grep title | cut -d '=' -f 2`
+    artist=`vorbiscomment -l $i | grep artist | cut -d '=' -f 2`
+    genre=`vorbiscomment -l $i | grep genre | cut -d '=' -f 2`
+    date=`vorbiscomment -l $i | grep date | cut -d '=' -f 2`
+    album=`vorbiscomment -l $i | grep album | cut -d '=' -f 2`
+    tracknumber=`vorbiscomment -l $i | grep tracknumber | cut -d '=' -f 2`
+
+    ogg123 -d wav -f $DESTDIR/$dirname/$filename.wav $i
+    lame \
+        --tt "$title" \
+        --ta "$artist" \
+        --tl "$album" \
+        --ty "$date" \
+        --tn "$tracknumber" \
+        --tg "$genre" \
+        $DESTDIR/$dirname/$filename.wav $DESTDIR/$dirname/$filename.mp3
+    rm $DESTDIR/$dirname/$filename.wav
+done

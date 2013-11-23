@@ -1,0 +1,17 @@
+#!/bin/sh
+
+cat <<EOF > index.html
+<html>
+    <head>
+        <title>pretty pictures</title>
+    </head>
+    <body>
+EOF
+
+ls --escape -1 | while read i; do
+    if convert -resize 200 "$i" "tiny_$i"; then
+        echo "<a href=\"$i\"><img src=\"tiny_$i\"></a>" >> index.html
+    fi
+done
+
+echo "</body></html>" >> index.html
