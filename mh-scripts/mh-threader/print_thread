@@ -1,0 +1,53 @@
+#!/bin/bash
+
+if [ "x$1" == "x" ]
+then
+    message=`pick cur`
+else
+    message=`pick $1`
+fi
+
+parent_folder=`folder -list`
+thread_folder="$parent_folder/thread"
+
+scan_format="%(msg)\
+%<(cur)+%| %>\
+%<{replied}-%?{encrypted}E%| %>\
+%02(mon{date})/%02(mday{date})%<{date} %|*%>\
+%<(mymbox{from})%<{to}To:%14(decode(friendly{to}))%>%>\
+%<(zero)%17(decode(friendly{from}))%>  \
+%(decode{x-mh-thread-markup})\
+%(decode{subject})%<{body}<<%{body}>>%>
+"
+
+function show_messages() {
+    local folder
+    local format_dashes
+    local msgid
+    local id
+    local message_ids
+
+    folder=$1
+    format_dashes=$2
+
+    # Make sure the folder exists
+    folder -nocreate +$folder >/dev/null 2>&1
+    if [ $? -eq 0 ]
+    then
+
+        message_ids=`pick`
+        if [ $? -eq 0 ]
+        then
+            for id in $message_ids
+            do
+                eval scan -format \'"%<(unseen)U%| %>$format_dashes $scan_format"\' $id +$parent_folder
+                folder -nocreate +$folder >/dev/null 3>&1
+                show_messages "$folder/$id-reply" "--$format_dashes"
+            done
+        fi
+    fi
+}
+
+eval scan -format \'"%<(unseen)U%| %>$scan_format"\' $message +$parent_folder
+show_messages "$thread_folder/$message-reply" "--"
+folder +$parent_folder >/dev/null 2>&1

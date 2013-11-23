@@ -1,0 +1,126 @@
+#!/bin/bash
+
+#####################################################################
+#
+# Global Variables
+#
+#####################################################################
+
+# For now, let's just use 'cur' and the current folder
+root_message=$1
+parent_folder=`folder -list`
+thread_folder=`folder -fast -create +$parent_folder/thread`
+
+declare -a message_ids
+declare -a in_reply_tos
+
+#####################################################################
+#
+# Subroutines
+#
+#####################################################################
+
+function get_message_id() {
+    # $1 = message-id
+
+    for (( i = 0 ; i < ${#message_ids[@]} ; i++ ))
+    do
+        if [ ${mesage_ids[$i]} -eq $1 ];
+        then
+            return $1
+        fi
+    done
+    return 0
+}
+
+function get_reply_to_id() {
+    # $1 = in-reply-to id
+
+    the_reply_tos=''
+
+    for (( i = 0 ; i < ${#in_reply_tos[@]} ; i++ ))
+    do
+        if [ "x${in_reply_tos[$i]}" = "x$1" ];
+        then
+            the_reply_tos="$the_reply_tos $i"
+        fi
+    done
+    REPLY=$the_reply_tos
+}
+
+function build_replies() {
+    # $1 = message id
+
+    # Local variables
+    local message
+    local current_folder
+    local msgid
+    local message_folder
+    local replies
+    local id
+    local reply_message_id
+
+    message=$1
+    current_folder=`folder -list`
+
+    folder +$parent_folder >/dev/null 2>&1
+    msgid=`scan -format '%{message-id}' $message`
+
+    # Make sure this message isn't already in the folder
+    folder +$current_folder >/dev/null 2>&1
+    pick --message-id $msgid >/dev/null 2>&1
+    if [ $? -ne 0 ]
+    then
+
+        folder +$parent_folder >/dev/null 2>&1
+        refile -link -preserve $message +$current_folder
+
+        get_reply_to_id $msgid
+        replies=$REPLY
+        if [ "x$replies" != 'x'  ]
+        then
+            # The message has some replies
+            for id in $replies
+            do
+                message_folder=`folder -fast -create +$current_folder/$message-reply`
+                build_replies $id
+            done
+        fi
+    fi
+
+    folder +$current_folder >/dev/null 2>&1
+}
+
+##########################################
+#
+# Begin Main
+#
+##########################################
+
+folder +$parent_folder >/dev/null 2>&1
+thread_tops=`pick -not --in-reply-to '.*' $root_message`
+
+# Build our message id arrays
+# This tmpfile stuff is a horrible hack, but it's the only way I can get
+# bash to do this properly
+tmpfile=`mktemp`
+scan -format '%(msg) %{message-id} %{in-reply-to}' > $tmpfile
+exec 4<$tmpfile
+while read -u 4 id msg_id reply_to ;
+do
+    message_ids[$id]=$msg_id
+    in_reply_tos[$id]=$reply_to
+done
+rm $tmpfile
+
+if [ $? -eq 0 ]
+then
+    folder +$thread_folder >/dev/null 2>&1
+
+    for message in $thread_tops
+    do
+        build_replies $message
+    done
+
+    folder +$parent_folder >/dev/null 2>&1
+fi
